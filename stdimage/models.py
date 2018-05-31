@@ -125,6 +125,10 @@ class StdImageFieldFile(ImageFieldFile):
                     resample=resample
                 )
 
+        if variation.get('watermark'):
+            watermark = Image.open(variation.get('watermark'))
+            image.paste(watermark, (25, 25), watermark)
+
         return image, save_kargs
 
     @classmethod
@@ -174,6 +178,7 @@ class StdImageField(ImageField):
         'width': float('inf'),
         'height': float('inf'),
         'crop': False,
+        'watermark': '',
         'resample': Image.ANTIALIAS
     }
 
