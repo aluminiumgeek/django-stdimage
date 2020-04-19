@@ -139,7 +139,7 @@ class StdImageFieldFile(ImageFieldFile):
         file_name = '{file_name}.{variation_name}{extension}'.format(**{
             'file_name': file_name,
             'variation_name': variation_name,
-            'extension': 'jpg',
+            'extension': '.jpg',
         })
         return os.path.join(path, file_name)
 
