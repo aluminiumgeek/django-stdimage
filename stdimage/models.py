@@ -83,7 +83,7 @@ class StdImageFieldFile(ImageFieldFile):
         """Process variation before actual saving."""
         save_kargs = {}
         file_format = image.format
-        save_kargs['format'] = file_format
+        save_kargs['format'] = 'JPEG'
 
         resample = variation['resample']
 
@@ -105,7 +105,7 @@ class StdImageFieldFile(ImageFieldFile):
             size = tuple(int(i) if i != float('inf') else i
                          for i in size)
 
-            if file_format == 'JPEG':
+            if True:#file_format == 'JPEG':
                 # http://stackoverflow.com/a/21669827
                 image = image.convert('RGB')
                 save_kargs['optimize'] = True
@@ -139,7 +139,7 @@ class StdImageFieldFile(ImageFieldFile):
         file_name = '{file_name}.{variation_name}{extension}'.format(**{
             'file_name': file_name,
             'variation_name': variation_name,
-            'extension': ext,
+            'extension': 'jpg',
         })
         return os.path.join(path, file_name)
 
