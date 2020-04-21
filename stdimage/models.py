@@ -87,6 +87,8 @@ class StdImageFieldFile(ImageFieldFile):
 
         resample = variation['resample']
 
+        image = image.convert('RGB')
+
         if cls.is_smaller(image, variation):
             factor = 1
             while image.size[0] / factor \
@@ -107,7 +109,6 @@ class StdImageFieldFile(ImageFieldFile):
 
             if True:#file_format == 'JPEG':
                 # http://stackoverflow.com/a/21669827
-                image = image.convert('RGB')
                 save_kargs['optimize'] = True
                 save_kargs['quality'] = 'web_high'
                 if size[0] * size[1] > 10000:  # roughly <10kb
