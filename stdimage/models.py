@@ -76,6 +76,17 @@ class StdImageFieldFile(ImageFieldFile):
                     img.save(file_buffer, **save_kargs)
                     f = ContentFile(file_buffer.getvalue())
                     storage.save(variation_name, f)
+                with BytesIO() as webp_file_buffer:
+                    save_kargs['format'] = 'WEBP'
+                    save_kargs['quality'] = 75
+                    save_kargs['method'] = 3
+                    save_kargs.pop('optimize', None)
+                    save_kargs.pop('progressive', None)
+                    img.save(webp_file_buffer, **save_kargs)
+                    f = ContentFile(webp_file_buffer.getvalue())
+                    variation_name = variation_name.rsplit('.', 1)
+                    variation_name = variation_name[0] + '.webp'
+                    storage.save(variation_name, f)
         return variation_name
 
     @classmethod
