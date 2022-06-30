@@ -41,7 +41,7 @@ class StdImageFieldFile(ImageFieldFile):
                 ' but got %s'
                 ) % type(render_variations)
             raise TypeError(msg)
-        webp = self.render_original_photo_to_webp(file_name=self.name, replace=False, storage=self.storage)
+        self.render_original_photo_to_webp(file_name=self.name, replace=False, storage=self.storage)
         if render_variations:
             self.render_variations()
 
