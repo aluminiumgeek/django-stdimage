@@ -71,7 +71,12 @@ class StdImageFieldFile(ImageFieldFile):
 
         with storage.open(file_name) as f:
             with Image.open(f) as img:
-                img = img.convert('RGB')
+                file_extension = os.path.splitext(file_name)[-1]
+                if file_extension == '.png':
+                    img = img.convert('RGBA')
+                else:
+                    img = img.convert('RGB')
+
                 save_kargs = {}
                 save_kargs['format'] = 'WEBP'
                 save_kargs['quality'] = 75
