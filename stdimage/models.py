@@ -41,6 +41,7 @@ class StdImageFieldFile(ImageFieldFile):
                 ' but got %s'
                 ) % type(render_variations)
             raise TypeError(msg)
+        self.render_original_photo_to_webp(file_name=self.name, replace=False, storage=self.storage)
         if render_variations:
             self.render_variations()
 
@@ -50,9 +51,37 @@ class StdImageFieldFile(ImageFieldFile):
             or img.size[1] > variation['height']
 
     def render_variations(self, replace=False):
+        print('render_variation match')
         """Render all image variations and saves them to the storage."""
         for _, variation in self.field.variations.items():
             self.render_variation(self.name, variation, replace, self.storage)
+
+    @classmethod
+    def render_original_photo_to_webp(cls, file_name, replace=False, storage=default_storage):
+        result_file_name = file_name.rsplit('.', 1)
+        result_file_name = result_file_name[0] + '.webp'
+        if storage.exists(result_file_name):
+            if replace:
+                storage.delete(result_file_name)
+                logger.info('File "%s" already exists and has been replaced.',
+                            result_file_name)
+            else:
+                logger.info('File "%s" already exists.', result_file_name)
+                return result_file_name
+
+        with storage.open(file_name) as f:
+            with Image.open(f) as img:
+                img = img.convert('RGB')
+                save_kargs = {}
+                save_kargs['format'] = 'WEBP'
+                save_kargs['quality'] = 75
+                save_kargs['method'] = 3
+                with BytesIO() as webp_file_buffer:
+                    img.save(webp_file_buffer, **save_kargs)
+                    f = ContentFile(webp_file_buffer.getvalue())
+                    file_name = result_file_name
+                    storage.save(file_name, f)
+        return file_name
 
     @classmethod
     def render_variation(cls, file_name, variation, replace=False,
