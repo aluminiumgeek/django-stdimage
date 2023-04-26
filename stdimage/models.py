@@ -98,6 +98,11 @@ class StdImageFieldFile(ImageFieldFile):
 
         resample = variation['resample']
 
+        background = Image.new('RGBA', image.size, (255, 255, 255))
+        try:
+            image = Image.alpha_composite(background, image)
+        except:
+            print('alpha_composite() failed')
         image = image.convert('RGB')
 
         if cls.is_smaller(image, variation):
@@ -279,3 +284,4 @@ class StdImageField(ImageField):
         super().validate(value, model_instance)
         if self.force_min_size:
             MinSizeValidator(self.min_size[0], self.min_size[1])(value)
+
