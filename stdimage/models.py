@@ -71,6 +71,11 @@ class StdImageFieldFile(ImageFieldFile):
 
         with storage.open(file_name) as f:
             with Image.open(f) as img:
+                background = Image.new('RGBA', img.size, (255, 255, 255))
+                try:
+                    img = Image.alpha_composite(background, img)
+                except:
+                    print('alpha_composite() failed')
                 img = img.convert('RGB')
                 save_kargs = {}
                 save_kargs['format'] = 'WEBP'
