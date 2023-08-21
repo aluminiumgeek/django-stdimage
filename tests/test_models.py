@@ -1,40 +1,37 @@
-# coding: utf-8
-from __future__ import absolute_import, unicode_literals
-
 import io
-
 import os
-import pytest
-import uuid
+import time
+from copy import deepcopy
 
-from PIL import Image
+import pytest
+from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db.models.fields.files import ImageFieldFile
+from PIL import Image
 
+from stdimage.models import StdImageFieldFile
 
-class UUID4Monkey:
-    hex = '653d1c6863404b9689b75fa930c9d0a0'
-
-
-uuid.__dict__['uuid4'] = lambda: UUID4Monkey()
-
-import django  # NoQA
-from django.conf import settings  # NoQA
-
+from . import models
 from .models import (
-    SimpleModel, ResizeModel, AdminDeleteModel,
-    ThumbnailModel, ResizeCropModel, AutoSlugClassNameDirModel,
-    UUIDModel,
-    UtilVariationsModel,
+    AdminDeleteModel,
+    AdminUpdateModel,
+    CustomRenderVariationsModel,
+    ResizeCropModel,
+    ResizeModel,
+    SimpleModel,
+    ThumbnailModel,
     ThumbnailWithoutDirectoryModel,
-    CustomRenderVariationsModel)  # NoQA
+    UtilVariationsModel,
+)
 
-IMG_DIR = os.path.join(settings.MEDIA_ROOT, 'img')
+IMG_DIR = os.path.join(settings.MEDIA_ROOT, "img")
+
 FIXTURES = [
-    ('100.gif', 'GIF', 100, 100),
-    ('600x400.gif', 'GIF', 600, 400),
-    ('600x400.jpg', 'JPEG', 600, 400),
-    ('600x400.jpg', 'PNG', 600, 400),
+    ("100.gif", "GIF", 100, 100),
+    ("600x400.gif", "GIF", 600, 400),
+    ("600x400.jpg", "JPEG", 600, 400),
+    ("600x400.jpg", "PNG", 600, 400),
 ]
 
 
@@ -45,7 +42,7 @@ class TestStdImage:
     def setup(self):
         for fixture_filename, img_format, width, height in FIXTURES:
             with io.BytesIO() as f:
-                img = Image.new('RGB', (width, height), (255, 55, 255))
+                img = Image.new("RGB", (width, height), (255, 55, 255))
                 img.save(f, format=img_format)
                 suf = SimpleUploadedFile(fixture_filename, f.getvalue())
                 self.fixtures[fixture_filename] = suf
@@ -64,187 +61,267 @@ class TestModel(TestStdImage):
 
     def test_simple(self, db):
         """Tests if Field behaves just like Django's ImageField."""
-        instance = SimpleModel.objects.create(image=self.fixtures['100.gif'])
-        target_file = os.path.join(IMG_DIR, '100.gif')
-        source_file = self.fixtures['100.gif']
+        instance = SimpleModel.objects.create(image=self.fixtures["100.gif"])
+        target_file = os.path.join(IMG_DIR, "100.gif")
+        source_file = self.fixtures["100.gif"]
 
         assert SimpleModel.objects.count() == 1
         assert SimpleModel.objects.get(pk=1) == instance
 
         assert os.path.exists(target_file)
 
-        with open(target_file, 'rb') as f:
+        with open(target_file, "rb") as f:
             source_file.seek(0)
             assert source_file.read() == f.read()
 
     def test_variations(self, db):
         """Adds image and checks filesystem as well as width and height."""
-        instance = ResizeModel.objects.create(
-            image=self.fixtures['600x400.jpg']
-        )
+        instance = ResizeModel.objects.create(image=self.fixtures["600x400.jpg"])
 
-        source_file = self.fixtures['600x400.jpg']
+        source_file = self.fixtures["600x400.jpg"]
 
-        assert os.path.exists(os.path.join(IMG_DIR, 'image.jpg'))
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.jpg"))
         assert instance.image.width == 600
         assert instance.image.height == 400
-        path = os.path.join(IMG_DIR, 'image.jpg')
+        path = os.path.join(IMG_DIR, "600x400.jpg")
 
-        with open(path, 'rb') as f:
+        with open(path, "rb") as f:
             source_file.seek(0)
             assert source_file.read() == f.read()
 
-        path = os.path.join(IMG_DIR, 'image.medium.jpg')
+        path = os.path.join(IMG_DIR, "600x400.medium.jpg")
         assert os.path.exists(path)
         assert instance.image.medium.width == 400
         assert instance.image.medium.height <= 400
-        with open(os.path.join(IMG_DIR, 'image.medium.jpg'), 'rb') as f:
+        with open(os.path.join(IMG_DIR, "600x400.medium.jpg"), "rb") as f:
             source_file.seek(0)
             assert source_file.read() != f.read()
 
-        assert os.path.exists(os.path.join(IMG_DIR, 'image.thumbnail.jpg'))
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"))
         assert instance.image.thumbnail.width == 100
         assert instance.image.thumbnail.height <= 75
-        with open(os.path.join(IMG_DIR, 'image.thumbnail.jpg'), 'rb') as f:
+        with open(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"), "rb") as f:
             source_file.seek(0)
             assert source_file.read() != f.read()
 
     def test_cropping(self, db):
-        instance = ResizeCropModel.objects.create(
-            image=self.fixtures['600x400.jpg']
-        )
+        instance = ResizeCropModel.objects.create(image=self.fixtures["600x400.jpg"])
         assert instance.image.thumbnail.width == 150
         assert instance.image.thumbnail.height == 150
 
     def test_variations_override(self, db):
-        source_file = self.fixtures['600x400.jpg']
-        target_file = os.path.join(IMG_DIR, 'image.thumbnail.jpg')
+        source_file = self.fixtures["600x400.jpg"]
+        target_file = os.path.join(IMG_DIR, "image.thumbnail.jpg")
         os.mkdir(IMG_DIR)
         default_storage.save(target_file, source_file)
-        ResizeModel.objects.create(
-            image=self.fixtures['600x400.jpg']
-        )
-        thumbnail_path = os.path.join(IMG_DIR, 'image.thumbnail.jpg')
+        ResizeModel.objects.create(image=self.fixtures["600x400.jpg"])
+        thumbnail_path = os.path.join(IMG_DIR, "image.thumbnail.jpg")
         assert os.path.exists(thumbnail_path)
-        thumbnail_path = os.path.join(IMG_DIR, 'image.thumbnail_1.jpg')
+        thumbnail_path = os.path.join(IMG_DIR, "image.thumbnail_1.jpg")
         assert not os.path.exists(thumbnail_path)
 
     def test_delete_thumbnail(self, db):
         """Delete an image with thumbnail"""
-        obj = ThumbnailModel.objects.create(
-            image=self.fixtures['100.gif']
-        )
+        obj = ThumbnailModel.objects.create(image=self.fixtures["100.gif"])
         obj.image.delete()
-        path = os.path.join(IMG_DIR, 'image.gif')
+        path = os.path.join(IMG_DIR, "image.gif")
         assert not os.path.exists(path)
 
-        path = os.path.join(IMG_DIR, 'image.thumbnail.gif')
+        path = os.path.join(IMG_DIR, "image.thumbnail.gif")
         assert not os.path.exists(path)
 
     def test_fore_min_size(self, admin_client):
-        admin_client.post('/admin/tests/forceminsizemodel/add/', {
-            'image': self.fixtures['100.gif'],
-        })
-        path = os.path.join(IMG_DIR, 'image.gif')
+        admin_client.post(
+            "/admin/tests/forceminsizemodel/add/",
+            {
+                "image": self.fixtures["100.gif"],
+            },
+        )
+        path = os.path.join(IMG_DIR, "image.gif")
         assert not os.path.exists(path)
 
     def test_thumbnail_save_without_directory(self, db):
         obj = ThumbnailWithoutDirectoryModel.objects.create(
-            image=self.fixtures['100.gif']
+            image=self.fixtures["100.gif"]
         )
         obj.save()
         # Our model saves the images directly into the MEDIA_ROOT directory
         # not IMG_DIR, under a custom name
-        original = os.path.join(settings.MEDIA_ROOT, 'custom.gif')
-        thumbnail = os.path.join(settings.MEDIA_ROOT, 'custom.thumbnail.gif')
+        original = os.path.join(settings.MEDIA_ROOT, "custom.gif")
+        thumbnail = os.path.join(settings.MEDIA_ROOT, "custom.thumbnail.gif")
         assert os.path.exists(original)
         assert os.path.exists(thumbnail)
 
     def test_custom_render_variations(self, db):
         instance = CustomRenderVariationsModel.objects.create(
-            image=self.fixtures['600x400.jpg']
+            image=self.fixtures["600x400.jpg"]
         )
         # Image size must be 100x100 despite variations settings
         assert instance.image.thumbnail.width == 100
         assert instance.image.thumbnail.height == 100
+
+    def test_defer(self, db, django_assert_num_queries):
+        """
+        `set_variations` does not access a deferred field.
+
+        Accessing a deferred field would cause Django to do
+        a second implicit database query.
+        """
+        instance = ResizeModel.objects.create(image=self.fixtures["100.gif"])
+        with django_assert_num_queries(1):
+            deferred = ResizeModel.objects.only("pk").get(pk=instance.pk)
+        with django_assert_num_queries(1):
+            deferred.image
+        assert instance.image.thumbnail == deferred.image.thumbnail
+
+    @pytest.mark.django_db
+    def test_variations_deepcopy(self):
+        """Tests test_variations() with a deep copied object"""
+        instance_original = ResizeModel.objects.create(
+            image=self.fixtures["600x400.jpg"]
+        )
+        instance = deepcopy(instance_original)
+        assert isinstance(instance.image, StdImageFieldFile)
+
+        assert hasattr(instance.image, "thumbnail")
+        assert hasattr(instance.image, "medium")
+
+        assert isinstance(instance.image.thumbnail, ImageFieldFile)
+        assert isinstance(instance.image.medium, ImageFieldFile)
+
+        source_file = self.fixtures["600x400.jpg"]
+
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.jpg"))
+        assert instance.image.width == 600
+        assert instance.image.height == 400
+        path = os.path.join(IMG_DIR, "600x400.jpg")
+
+        with open(path, "rb") as f:
+            source_file.seek(0)
+            assert source_file.read() == f.read()
+
+        path = os.path.join(IMG_DIR, "600x400.medium.jpg")
+        assert os.path.exists(path)
+        assert instance.image.medium.width == 400
+        assert instance.image.medium.height <= 400
+        with open(os.path.join(IMG_DIR, "600x400.medium.jpg"), "rb") as f:
+            source_file.seek(0)
+            assert source_file.read() != f.read()
+
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"))
+        assert instance.image.thumbnail.width == 100
+        assert instance.image.thumbnail.height <= 75
+        with open(os.path.join(IMG_DIR, "600x400.thumbnail.jpg"), "rb") as f:
+            source_file.seek(0)
+            assert source_file.read() != f.read()
 
 
 class TestUtils(TestStdImage):
     """Tests Utils"""
 
     def test_deletion_singnal_receiver(self, db):
-        obj = SimpleModel.objects.create(
-            image=self.fixtures['100.gif']
-        )
+        obj = AdminDeleteModel.objects.create(image=self.fixtures["100.gif"])
+        path = obj.image.path
         obj.delete()
-        assert not os.path.exists(os.path.join(IMG_DIR, 'image.gif'))
+        assert not os.path.exists(path)
+
+    def test_deletion_singnal_receiver_many(self, db):
+        obj = AdminDeleteModel.objects.create(image=self.fixtures["100.gif"])
+        path = obj.image.path
+        AdminDeleteModel.objects.all().delete()
+        assert not os.path.exists(path)
 
     def test_pre_save_delete_callback_clear(self, admin_client):
-        AdminDeleteModel.objects.create(
-            image=self.fixtures['100.gif']
+        obj = AdminDeleteModel.objects.create(image=self.fixtures["100.gif"])
+        path = obj.image.path
+        admin_client.post(
+            "/admin/tests/admindeletemodel/1/change/",
+            {
+                "image-clear": "checked",
+            },
         )
-        if django.VERSION >= (1, 9):
-            admin_client.post('/admin/tests/admindeletemodel/1/change/', {
-                'image-clear': 'checked',
-            })
-        else:
-            admin_client.post('/admin/tests/admindeletemodel/1/', {
-                'image-clear': 'checked',
-            })
-        assert not os.path.exists(os.path.join(IMG_DIR, 'image.gif'))
+        assert not os.path.exists(path)
 
     def test_pre_save_delete_callback_new(self, admin_client):
-        AdminDeleteModel.objects.create(
-            image=self.fixtures['100.gif']
+        obj = AdminDeleteModel.objects.create(image=self.fixtures["100.gif"])
+        path = obj.image.path
+        assert os.path.exists(path)
+        admin_client.post(
+            "/admin/tests/admindeletemodel/1/change/",
+            {
+                "image": self.fixtures["600x400.jpg"],
+            },
         )
-        if django.VERSION >= (1, 9):
-            admin_client.post('/admin/tests/admindeletemodel/1/change/', {
-                'image': self.fixtures['600x400.jpg'],
-            })
-        else:
-            admin_client.post('/admin/tests/admindeletemodel/1/', {
-                'image': self.fixtures['600x400.jpg'],
-            })
-        assert not os.path.exists(os.path.join(IMG_DIR, 'image.gif'))
+        assert not os.path.exists(path)
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.jpg"))
 
-    def test_upload_to_auto_slug_class_name_dir(self, db):
-        AutoSlugClassNameDirModel.objects.create(
-            name='foo bar',
-            image=self.fixtures['100.gif']
+    def test_pre_save_delete_callback_update(self, admin_client):
+        obj = AdminUpdateModel.objects.create(image=self.fixtures["100.gif"])
+        path = obj.image.path
+        assert os.path.exists(path)
+        admin_client.post(
+            "/admin/tests/adminupdatemodel/1/change/",
+            {
+                "image": self.fixtures["600x400.jpg"],
+            },
         )
-        file_path = os.path.join(
-            settings.MEDIA_ROOT,
-            'autoslugclassnamedirmodel',
-            'foo-bar.gif'
-        )
-        assert os.path.exists(file_path)
-
-    def test_upload_to_uuid(self, db):
-        UUIDModel.objects.create(image=self.fixtures['100.gif'])
-        file_path = os.path.join(
-            IMG_DIR,
-            '653d1c6863404b9689b75fa930c9d0a0.gif'
-        )
-        assert os.path.exists(file_path)
+        assert not os.path.exists(path)
+        assert os.path.exists(os.path.join(IMG_DIR, "600x400.jpg"))
 
     def test_render_variations_callback(self, db):
-        UtilVariationsModel.objects.create(image=self.fixtures['100.gif'])
-        file_path = os.path.join(
-            IMG_DIR,
-            'image.thumbnail.gif'
-        )
+        obj = UtilVariationsModel.objects.create(image=self.fixtures["100.gif"])
+        file_path = obj.image.thumbnail.path
         assert os.path.exists(file_path)
+
+    def test_render_variations_overwrite(self, db, image_upload_file):
+        obj = ThumbnailModel.objects.create(image=image_upload_file)
+        file_path = obj.image.thumbnail.path
+        before = os.path.getmtime(file_path)
+        time.sleep(0.1)
+        os.remove(obj.image.path)
+        assert os.path.exists(file_path)
+        obj.image = image_upload_file
+        obj.save()
+        assert file_path == obj.image.thumbnail.path
+        after = os.path.getmtime(file_path)
+        assert before != after, obj.image.path
 
 
 class TestValidators(TestStdImage):
     def test_max_size_validator(self, admin_client):
-        admin_client.post('/admin/tests/maxsizemodel/add/', {
-            'image': self.fixtures['600x400.jpg'],
-        })
-        assert not os.path.exists(os.path.join(IMG_DIR, 'image.jpg'))
+        response = admin_client.post(
+            "/admin/tests/maxsizemodel/add/",
+            {
+                "image": self.fixtures["600x400.jpg"],
+            },
+        )
+        assert "too large" in response.context["adminform"].form.errors["image"][0]
+        assert not os.path.exists(os.path.join(IMG_DIR, "800x600.jpg"))
 
     def test_min_size_validator(self, admin_client):
-        admin_client.post('/admin/tests/minsizemodel/add/', {
-            'image': self.fixtures['100.gif'],
-        })
-        assert not os.path.exists(os.path.join(IMG_DIR, 'image.gif'))
+        response = admin_client.post(
+            "/admin/tests/minsizemodel/add/",
+            {
+                "image": self.fixtures["100.gif"],
+            },
+        )
+        assert "too small" in response.context["adminform"].form.errors["image"][0]
+        assert not os.path.exists(os.path.join(IMG_DIR, "100.gif"))
+
+
+class TestJPEGField(TestStdImage):
+    def test_convert(self, db):
+        obj = models.JPEGModel.objects.create(image=self.fixtures["100.gif"])
+        assert obj.image.thumbnail.path.endswith("img/100.thumbnail.jpeg")
+        assert obj.image.full.width == 100
+        assert obj.image.full.height == 100
+
+    def test_convert_multiple(self, db):
+        large = models.JPEGModel.objects.create(image=self.fixtures["600x400.gif"])
+        small = models.JPEGModel.objects.create(image=self.fixtures["100.gif"])
+
+        assert large.image.field._variations["full"] == (None, None)
+        assert small.image.field._variations["full"] == (None, None)
+
+        assert large.image.full.width == 600
+        assert small.image.full.width == 100
