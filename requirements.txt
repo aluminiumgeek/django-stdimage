@@ -1,2 +1,2 @@
-pillow>=2.5
+pillow>=10.0.0
 progressbar2>=3.0.0
