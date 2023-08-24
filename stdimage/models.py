@@ -230,7 +230,7 @@ class StdImageField(ImageField):
         'height': float('inf'),
         'crop': False,
         'watermark': '',
-        'resample': Image.ANTIALIAS
+        'resample': Image.LANCZOS,
     }
 
     def __init__(self, verbose_name=None, name=None, variations=None,
