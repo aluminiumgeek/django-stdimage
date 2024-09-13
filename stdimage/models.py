@@ -71,6 +71,11 @@ class StdImageFieldFile(ImageFieldFile):
 
         with storage.open(file_name) as f:
             with Image.open(f) as img:
+                try:
+                    # Fix the rotation issue (resulting images are rotated different from the original image)
+                    img = ImageOps.exif_transpose(img)
+                except:
+                    pass
                 background = Image.new('RGBA', img.size, (255, 255, 255))
                 try:
                     img = Image.alpha_composite(background, img)
@@ -105,6 +110,11 @@ class StdImageFieldFile(ImageFieldFile):
         ImageFile.LOAD_TRUNCATED_IMAGES = True
         with storage.open(file_name) as f:
             with Image.open(f) as img:
+                try:
+                    # Fix the rotation issue (resulting images are rotated different from the original image)
+                    img = ImageOps.exif_transpose(img)
+                except:
+                    pass
                 img, save_kargs = cls.process_variation(variation, image=img)
                 with BytesIO() as file_buffer:
                     img.save(file_buffer, **save_kargs)
