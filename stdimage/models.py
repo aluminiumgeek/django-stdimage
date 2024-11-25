@@ -145,8 +145,12 @@ class StdImageFieldFile(ImageFieldFile):
         background = Image.new('RGBA', image.size, (255, 255, 255))
         try:
             image = Image.alpha_composite(background, image)
-        except:
-            print('alpha_composite() failed')
+        except ValueError:  # mode do not match
+            image = image.convert('RGBA')
+            try:
+                image = Image.alpha_composite(background, image)
+            except:
+                print('alpha_composite() failed')
         image = image.convert('RGB')
 
         if cls.is_smaller(image, variation):
