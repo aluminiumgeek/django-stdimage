@@ -44,6 +44,7 @@ class StdImageFieldFile(ImageFieldFile):
         self.render_original_photo_to_webp(file_name=self.name, replace=False, storage=self.storage)
         if render_variations:
             self.render_variations()
+        self.field.set_variations(self.instance)
 
     @staticmethod
     def is_smaller(img, variation):
